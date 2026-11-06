@@ -112,7 +112,8 @@ ls -d /sys/module/kernelsu
 
 ```
 main/
-  ksu                   单文件一键，尾部载荷 gzip+tar
+  ksu.sh                控制器全文，469 行 shell —— 想看逻辑直接读这个
+  ksu                   单文件一键，尾部载荷 gzip+tar（前 17572 字节 == ksu.sh）
   README_ONDEVICE.md    设备端全流程：槽位、判据、收尾细节
 src/
   gl/                   栈喷射源码（含 BUILD.md）
@@ -122,9 +123,10 @@ bin/
 config/
   pju110_4.19.191.config 从本机 /proc/config.gz 原样导出，6211 行
 tools/
+  pack.sh               从 ksu.sh + 四件从零组装出一个 ksu
   unpack.sh             按脚本里的 PAYLOAD_OFFSET 切出四件并核对 md5
   repack.sh             换掉其中一件再拼回去，头部逐字节不变
-  verify.sh             一次性核对头部长度、shell 语法、四件 md5
+  verify.sh             核对可读副本同步、头部长度、shell 语法、四件 md5
 docs/
   01-x18-register-panic.md           一次真机 panic 的完整定位与修法
   02-uapi6-lookup-symbols.md         4.19 上补 UAPI6 新超调用
@@ -145,12 +147,40 @@ docs/
 
 | 想看什么 | 去哪 |
 |---|---|
+| 控制器那 469 行到底怎么判定的（不用解包，直接读） | `main/ksu.sh` |
 | 设备端完整流程与收尾动作 | `main/README_ONDEVICE.md` |
 | 那次 panic：`ldr x3,[x18]`、x18=`0xb538`、`ksu54_resolve_all+0xbc` | `docs/01-x18-register-panic.md` |
 | 4.19 上怎么把 UAPI6 的 `LOOKUP_SYMBOLS` 补上 | `docs/02-uapi6-lookup-symbols.md` |
 | 为什么只替换外部 `ksu_raw.ko` 不生效 | `docs/03-self-contained-payload.md` |
 | 耗时、判据、回滚 | `docs/04-load-baseline-and-rollback.md` |
 | 编译选项与可复现构建 | `src/gl/BUILD.md`、`src/ksu/BUILD.md` |
+
+## 没收录什么
+
+有三样故意不在仓库里，原因不同，写清楚省得有人以为漏了：
+
+| 不在仓库的 | 原因 | 你需要怎么办 |
+|---|---|---|
+| 1.4 GB vendor 内核树 | 厂商代码，体积也不是 git 该装的东西 | 自备同版本 4.19.191 源码树，`.config` 用 `config/` 里那份，见 `src/ksu/BUILD.md` |
+| ksud 用户态源码（Rust） | 上游 KernelSU 的组件，这次没有改动 | 载荷里的 `libksud.so` 是编好的成品，随 `ksu` 落盘即用，不需要自己编 |
+| 管理器 App | 上游 KernelSU 官方应用 | 装官方 App，它能认出 32715 / UAPI 6 的内核侧 |
+
+## 从头复现的完整路径
+
+```sh
+# 1) 内核模块：内核树 + config/pju110_4.19.191.config，按 src/ksu/BUILD.md 编出 ksu_raw.ko
+# 2) 喷射程序：
+aarch64-linux-gnu-gcc -static -O2 -pthread src/gl/gl_pju110.c -o gl_v112
+# 3) allowlist（参数依次是 uid、包名、SELinux 域、输出文件）：
+python3 src/tools/gen_allowlist.py 10266 me.weishu.kernelsu u:r:ksu:s0 allowlist.bin
+# 4) 组装：目录里放 lt/gl_v112 和 dl/{ksu_raw.ko,libksud.so,allowlist.bin}
+sh tools/pack.sh <那个目录> main/ksu.new
+# 5) 自检
+sh tools/verify.sh
+```
+
+第 2 步编出来的 `gl_v112` 与仓库载荷**逻辑等价但字节不同**：换了编译器版本，指令排布会变，
+喷射时序跟着变，所以不建议直接替换载荷。`src/gl/BUILD.md` 里有实测差异数据。
 
 ## 许可
 

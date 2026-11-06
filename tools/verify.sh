@@ -4,33 +4,52 @@
 #   用法: sh verify.sh [仓库根目录]
 #   在仓库根目录跑: sh tools/verify.sh
 #
-# 校验两件事：
-#   1) main/ksu 的头部长度与 PAYLOAD_OFFSET 是否自洽
-#   2) 载荷四件的 md5 是否等于本机验证过的值
+# 校验三件事：
+#   1) main/ksu.sh 是否等于 main/ksu 的前 N 字节（可读副本不能和成品漂移）
+#   2) main/ksu 的头部长度与 PAYLOAD_OFFSET 是否自洽
+#   3) 载荷四件的 md5 是否等于本机验证过的值
 
 set -u
 ROOT=${1:-.}
+KSU=$ROOT/main/ksu
+HDR=$ROOT/main/ksu.sh
 FAIL=0
 
 say() { printf '%s\n' "$*"; }
 ok()  { printf '  [OK]   %s\n' "$*"; }
 bad() { printf '  [FAIL] %s\n' "$*"; FAIL=$((FAIL + 1)); }
 
+say "===== 0) 可读头部与成品是否同步 ====="
+if [ ! -f "$HDR" ]; then
+    bad "缺少 $HDR"
+elif [ ! -f "$KSU" ]; then
+    bad "缺少 $KSU"
+else
+    HS=$(wc -c < "$HDR")
+    H1=$(md5sum "$HDR" | cut -d' ' -f1)
+    H2=$(head -c "$HS" "$KSU" | md5sum | cut -d' ' -f1)
+    if [ "$H1" = "$H2" ]; then
+        ok "main/ksu.sh 等于 main/ksu 前 $HS 字节（md5 $H1）"
+    else
+        bad "main/ksu.sh 与成品头部不一致（$H1 ≠ $H2）"
+    fi
+fi
+
+say ""
 say "===== 1) main/ksu 结构 ====="
-KSU=$ROOT/main/ksu
 if [ ! -f "$KSU" ]; then
     bad "缺少 $KSU"
 else
     SIZE=$(wc -c < "$KSU")
     OFF=$(awk 'index($0,"PAYLOAD_OFFSET=")==1{sub(/^PAYLOAD_OFFSET=/,"");print;exit}' "$KSU" 2>/dev/null)
-    say "  大小        : $SIZE"
+    say "  大小          : $SIZE"
     say "  PAYLOAD_OFFSET: ${OFF:-读不出}"
     if [ -n "$OFF" ]; then
         HEAD=$((OFF - 1))
         ACT=$(head -c "$HEAD" "$KSU" | wc -c)
         if [ "$ACT" -eq "$HEAD" ]; then ok "头部 $HEAD 字节完整"; else bad "头部长度 $ACT ≠ $HEAD"; fi
         if head -c "$HEAD" "$KSU" | sh -n 2>/dev/null; then ok "头部 shell 语法通过"; else bad "头部语法不通过"; fi
-        say "  头部 md5    : $(head -c "$HEAD" "$KSU" | md5sum | cut -d' ' -f1)"
+        say "  头部 md5      : $(head -c "$HEAD" "$KSU" | md5sum | cut -d' ' -f1)"
     fi
 fi
 
