@@ -1,0 +1,26 @@
+# 构建产物
+*.o
+*.ko
+*.cmd
+*.mod
+*.mod.c
+*.symvers
+*.order
+.tmp_versions/
+*.dwo
+
+# 本地调试/中转
+*.bak
+*.log
+*.log.*
+payload/
+repack_*/
+verify_*/
+.ksu_slots
+ksu_new
+kmod-build/
+
+# 编辑器
+.vscode/
+.idea/
+*.swp
