@@ -100,7 +100,8 @@ ls -d /sys/module/kernelsu
 
 ## 做不到的
 
-- **通不过别的内核**：模块 vermagic 绑死 `4.19.191+`，`gl` 里的栈偏移绑死这台机器的 `vmlinux`。
+- **通不过别的内核**：模块 vermagic 绑死 `4.19.191+`，`gl` 里 49 处内核地址和槽位偏移绑死这台机器的 `vmlinux`。
+  换机型能复用的是方法，不是数值 —— 要重算哪些、怎么验，`docs/05-port-to-another-device.md` 有完整清单。
 - **`ksu_raw.ko` 没 strip**：4,697,872 B 里约 4.4 MB 是 `.debug_*`。strip 完约 292 KB，也能加载，
   但那就不是本机验证过的那一份了 —— 换模块等于重来一遍验证（还要再踩一次重启）。详见 `bin/README.md`。
 - **UAPI 6 的 `LOOKUP_SYMBOLS` 属于可选项**：本机 4.19 没有 `kallsyms_on_each_symbol`，走的是模块内
@@ -132,6 +133,7 @@ docs/
   02-uapi6-lookup-symbols.md         4.19 上补 UAPI6 新超调用
   03-self-contained-payload.md       单文件脚本重打包的偏移约束
   04-load-baseline-and-rollback.md   耗时基线、判据、回滚
+  05-port-to-another-device.md       换机型：要重算哪些常量、按什么顺序验证
 ```
 
 载荷四件（解开 `ksu` 尾部即为这四份）：
@@ -153,6 +155,7 @@ docs/
 | 4.19 上怎么把 UAPI6 的 `LOOKUP_SYMBOLS` 补上 | `docs/02-uapi6-lookup-symbols.md` |
 | 为什么只替换外部 `ksu_raw.ko` 不生效 | `docs/03-self-contained-payload.md` |
 | 耗时、判据、回滚 | `docs/04-load-baseline-and-rollback.md` |
+| 换机型要重算哪些常量、按什么顺序验证 | `docs/05-port-to-another-device.md` |
 | 编译选项与可复现构建 | `src/gl/BUILD.md`、`src/ksu/BUILD.md` |
 
 ## 没收录什么
